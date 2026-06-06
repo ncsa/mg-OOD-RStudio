@@ -1,0 +1,7 @@
+---
+name: RStudio Server
+category: Interactive Apps
+#subcategory: Servers
+role: batch_connect
+description: |
+  This app will launch RStudio Server inside of a container running in a Slurm job.

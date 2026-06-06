@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+# Load the required environment
+setup_env () {
+  # Additional environment which could be moved into a module
+  # Change these to suit
+export RSTUDIO_SERVER_IMAGE="<% if context.bc_custom_image != '' %><%= context.bc_custom_image %><% else %><%= context.bc_image %><% end %>"
+#  export APPTAINER_BINDPATH="/etc,/media,/mnt,/opt,/srv,/usr/lib,/lib,/lib64,/usr/apps,/var"
+  export PATH="$PATH:/usr/lib/rstudio-server/bin"
+  export APPTAINERENV_PATH="$PATH"
+  # In Singularity 3.5.x it became necessary to explicitly pass LD_LIBRARY_PATH
+  # to the singularity process
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/R/4.4.0/lib/R/lib"
+  #  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/apps/general/spack/sw/linux-rhel8-zen/gcc-11.3.0/r-4.2.0-2liuw4vmic27cmqhyyt6jmvwbezn6mlx/rlib/R/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/curl-8.0.1-u7dljxx4j2vkwnhrbxl5dnigktopsogc/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/expat-2.5.0-37la23gnxetfy3uytrvk47cmtlycoska/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/geos-3.11.2-ipmlasljmvtuoykqyycrtu5gy4zw47cm/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/json-c-0.16-7lokifwb6lzpml5k63adfgzrbrnc3hi2/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/libgeotiff-1.6.0-ql2lodtsyry5cw25ngozc7qtb2jhf6zo/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/libjpeg-turbo-2.1.4-cmeyyk3pssdcvl4i4ijmfeoqiubfvby3/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/libpng-1.6.39-rpbqrtfdirzf3fojuav2it3lpeqmmnye/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/libtiff-4.4.0-q2c2seunvg5ym3qhgdwe3d3mkr72z5lb/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/proj-8.2.1-t3pclijfh275ljxzranxvzs22hlene5j/lib64:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/sqlite-3.40.1-ux7pnanmrgn4dvcm6qwrbvesyfposm56/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/zlib-1.2.13-smcuvhowz7cwxhb5jcy647kjmrnx4tbc/lib:/usr/apps/general/spack/sw/linux-rhel8-zen/gcc-8.5.0/gcc-11.3.0-cwx43q6qt46zl5olgckurx67xtg4nuyd/lib64:/usr/apps/general/spack/sw/linux-rhel8-zen/gcc-8.5.0/glib-2.74.6-4wqjtnm3mebxlldhaxpbh4ptqtaxjmoa/lib:/usr/apps/general/spack/sw/linux-rhel8-zen/gcc-11.3.0/hdf5-1.14.0-5xrz3r365nib6fma73irar6fbrgyzhd4/lib:/usr/apps/general/spack/sw/linux-rhel8-cascadelake/gcc-11.3.0/gdal-3.6.3-tkiuujut7ibrj3ljcof2r7zonydhmqt6/lib64"
+  export APPTAINERENV_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+}
+setup_env
+#echo $APPTAINER_BINDPATH
+#echo $APPTAINERENV_PATH
+#echo $APPTAINERENV_LD_LIBRARY_PATH
+
+#export WORKING_DIR="< % = session_dir % >"
+export WORKING_DIR=${PWD}
+
+#
+# Start RStudio Server
+#
+
+# PAM auth helper used by RStudio
+export RSTUDIO_AUTH="${WORKING_DIR}/bin/auth"
+
+# Generate an `rsession` wrapper script
+export RSESSION_WRAPPER_FILE="$WORKING_DIR/rsession.sh"
+(
+umask 077
+sed 's/^ \{2\}//' > "$WORKING_DIR/rsession.sh" << EOL
+  #!/usr/bin/env bash
+
+  # Log all output from this script
+  export RSESSION_LOG_FILE="$WORKING_DIR/rsession.log"
+
+  exec &>>"\${RSESSION_LOG_FILE}"
+  set -x
+
+  # rsession.sh doesn't share the same env as the outside script, so these
+  # need to be set explicitly
+  export R_LIBS_SITE="${R_LIBS_SITE}"
+  export RSTUDIO_DATA_HOME="/scratch/rstudio_user_data/${USER}/session_data"
+  export TZ="US/Eastern"
+  export HOME="$HOME"
+  export MODULEPATH_ROOT="$MODULEPATH_ROOT"
+  export MODULEPATH="$MODULEPATH"
+  export LMOD_PKG="$LMOD_PKG"
+
+  env
+
+  # Launch the original command
+  echo "Launching rsession..."
+  echo "...with args..."
+  echo "\${@}"
+  exec rsession --r-libs-user "${R_LIBS_USER}" "\${@}"
+EOL
+)
+chmod 700 "$WORKING_DIR/rsession.sh"
+
+# Create DB config file
+(
+umask 077
+sed 's/^ \{2\}//' > "$WORKING_DIR/database.conf" << EOL
+  provider=sqlite
+  directory="$WORKING_DIR"
+  exec rsession --r-libs-user "${R_LIBS_USER}" "\${@}"
+EOL
+)
+chmod 700 "$WORKING_DIR/database.conf"
+
+# Set working directory to home directory
+cd "${HOME}"
+
+# server log directory in this job's working directory
+mkdir -p "${WORKING_DIR}/logs"
+(
+umask 077
+sed 's/^ \{2\}//' > "$WORKING_DIR/logging.conf" << EOL
+  [*]
+  log-dir="${WORKING_DIR}/logs"
+EOL
+)
+chmod 700 "$WORKING_DIR/logging.conf"
+
+export TMPDIR="$(mktemp -d)"
+#TMPDIR="${WORKING_DIR}/tmp"
+#mkdir -p $TMPDIR
+
+mkdir -p "$TMPDIR/rstudio-server"
+python3 -c 'from uuid import uuid4; print(uuid4())' > "$TMPDIR/rstudio-server/secure-cookie-key"
+chmod 0600 "$TMPDIR/rstudio-server/secure-cookie-key"
+
+module purge
+
+set -x
+# Launch the RStudio Server
+echo "Starting up rserver..."
+
+apptainer run --no-mount /usr/apps -B "$TMPDIR:/tmp,${WORKING_DIR}/logging.conf:/etc/rstudio/logging.conf" "$RSTUDIO_SERVER_IMAGE" rserver --www-port ${port} --auth-none 0 --auth-pam-helper-path "${RSTUDIO_AUTH}" --auth-encrypt-password 0 --rsession-path "${RSESSION_WRAPPER_FILE}" --server-data-dir="${TMPDIR}/run" --secure-cookie-key-file "${TMPDIR}/rstudio-server/secure-cookie-key" --server-user=$(whoami) --database-config-file="$WORKING_DIR/database.conf"
+
+echo 'Singularity has exited...'

@@ -1,0 +1,93 @@
+# Batch Connect app configuration file
+---
+
+cluster: "magnus"
+
+attributes:
+
+  bc_image:
+    label: "Select from provided container images or custom"
+    widget: "select"
+    value: "R 4.6.0"
+    options:
+      - ["R 4.6.0","/usr/local/oodimages/rstudio/rocker-rstudio-R_4.6.0-RStudio_2026.04.0-526-20260512-00.sif",data-hide-bc-custom-image: true,data-set-bc-custom-image: ""]
+      - ["R 4.5.3","/usr/local/oodimages/rstudio/rocker-rstudio-R_4.5.3-RStudio_2026.04.0-526-20260608-00.sif",data-hide-bc-custom-image: true,data-set-bc-custom-image: ""]
+      - ["custom","custom"]
+    # cachable: false
+
+  bc_custom_image:
+    label: "Select custom container image"
+    widget: "path_selector"
+    help: "Enter the path for your own Apptainer .sif image that contains R and RStudio. Images pulled from the Rocker project (https://rocker-project.org/images/), or using one of those containers as a starting point, are likely to work."
+
+  bc_reservation:
+    label: "Name of reservation (leave empty if none)"
+    widget: "text_field"
+    value: ""
+
+#  bc_partition:
+#    label: "Partition"
+#    widget: "select"
+#    value: "magnus"
+#    options:
+#      - ["debug","debug"]
+#      - ["gpu","gpu"]
+#      - ["magnus","magnus"]
+
+  bc_partition:
+    label: "Partition"
+    widget: select
+    value: "magnus"
+    options:
+##      <%- CustomPartitions.partitions.each do |a| %>
+##      - [ "<%= a.strip %>", "<%= a %>" ]
+##      <%- end -%>
+      <%- CustomPartitions.partitions.each do |a| %>
+      - [ "<%= a.strip %>", "<%= a %>" ]
+      <%- end -%>
+#    cacheable: false
+###    help: "The rstudio partition is available to launch small sessions without delay. Sessions there are restricted to 1 core and a maximum of 8 GB of RAM."
+
+  bc_num_slots:
+    label: "Number of CPUs"
+    widget: "number_field"
+    min: "1"
+###    help: "The rstudio partition only allows single-core sessions."
+
+  bc_num_memory:
+    label: "Amount of RAM"
+    widget: "text_field"
+###    help: "Total memory for the node/session (--mem in Slurm). Use Slurm format, e.g., 4096M, 10G. If left blank, 4505 MB will be allocated per CPU core requested. A minimum of 4 GB is required for each job and lower values will be substituted before submission. The rstudio partition allows a maximum of 8 GB."
+    help: "Total memory for the node/session (--mem in Slurm). Use Slurm format, e.g., 4096M, 10G. If left blank, 4505 MB will be allocated per CPU core requested. A minimum of 4 GB is required for each job and lower values will be substituted before submission."
+
+  bc_num_gpus:
+    label: "Number of GPUs"
+#    widget: "number_field"
+    widget: "text_field"
+#    max: "4"
+#    min: "0"
+
+  bc_num_hours:
+    label: "Number of hours"
+    widget: "number_field"
+    max: "720"
+    min: "1"
+
+#  working_dir:
+#    label: "Working Directory"
+#    data-filepicker: true
+#    data-target-file-type: dirs  # Valid values are: files, dirs, or both
+#    readonly: false
+#    help: "Select your project directory; defaults to $HOME"
+
+form:
+  - bc_image
+  - bc_custom_image
+  - bc_partition
+  - bc_num_hours
+  - bc_reservation
+  - bc_num_slots
+  - bc_num_memory
+  - bc_num_gpus
+#  - working_dir
+  - bc_email_on_started
