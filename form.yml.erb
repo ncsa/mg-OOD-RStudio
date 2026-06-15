@@ -25,28 +25,21 @@ attributes:
     widget: "text_field"
     value: ""
 
-#  bc_partition:
-#    label: "Partition"
-#    widget: "select"
-#    value: "magnus"
-#    options:
-#      - ["debug","debug"]
-#      - ["gpu","gpu"]
-#      - ["magnus","magnus"]
-
   bc_partition:
     label: "Partition"
     widget: select
     value: "magnus"
     options:
-##      <%- CustomPartitions.partitions.each do |a| %>
-##      - [ "<%= a.strip %>", "<%= a %>" ]
-##      <%- end -%>
+      # the CustomPartitions function does NOT include 'rstudio'
+      # in its output at this time
+      - [ "rstudio", "rstudio" ]
       <%- CustomPartitions.partitions.each do |a| %>
+      # do NOT allow users to submit to "wide" H100 GPU partitions
+      <%- next if a.strip =~ /^(caim_gpu|wide_gpu)/ -%>
       - [ "<%= a.strip %>", "<%= a %>" ]
       <%- end -%>
 #    cacheable: false
-###    help: "The rstudio partition is available to launch small sessions without delay. Sessions there are restricted to 1 core and a maximum of 8 GB of RAM."
+    help: "The rstudio partition is available in Slurm to launch small sessions with minimal wait time. Sessions there are restricted to 1 core and a maximum of 8 GB of RAM. If you need to start a larger session you can launch it into a different partition but note that you may have to wait longer for it to start."
 
   bc_num_slots:
     label: "Number of CPUs"
@@ -90,4 +83,6 @@ form:
   - bc_num_memory
   - bc_num_gpus
 #  - working_dir
-  - bc_email_on_started
+  # email is broken (OOD doesn't know the user's email; we can fix this with a custom initializer
+  # but remove this for now)
+#  - bc_email_on_started
