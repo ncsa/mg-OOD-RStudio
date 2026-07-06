@@ -88,6 +88,15 @@ EOL
 )
 chmod 700 "$WORKING_DIR/logging.conf"
 
+# customize rsession.conf:
+(
+umask 022
+sed 's/^ \{2\}//' > "$WORKING_DIR/rsession.conf" << EOL
+  # R Session Configuration File
+  copilot-enabled=1
+EOL
+)
+
 export TMPDIR="$(mktemp -d)"
 #TMPDIR="${WORKING_DIR}/tmp"
 #mkdir -p $TMPDIR
@@ -102,6 +111,6 @@ set -x
 # Launch the RStudio Server
 echo "Starting up rserver..."
 
-apptainer run --no-mount /usr/apps -B "$TMPDIR:/tmp,${WORKING_DIR}/logging.conf:/etc/rstudio/logging.conf" "$RSTUDIO_SERVER_IMAGE" rserver --www-port ${port} --auth-none 0 --auth-pam-helper-path "${RSTUDIO_AUTH}" --auth-encrypt-password 0 --rsession-path "${RSESSION_WRAPPER_FILE}" --server-data-dir="${TMPDIR}/run" --secure-cookie-key-file "${TMPDIR}/rstudio-server/secure-cookie-key" --server-user=$(whoami) --database-config-file="$WORKING_DIR/database.conf"
+apptainer run --no-mount /usr/apps -B "$TMPDIR:/tmp,${WORKING_DIR}/logging.conf:/etc/rstudio/logging.conf,${WORKING_DIR}/rsession.conf:/etc/rstudio/rsession.conf" "$RSTUDIO_SERVER_IMAGE" rserver --www-port ${port} --auth-none 0 --auth-pam-helper-path "${RSTUDIO_AUTH}" --auth-encrypt-password 0 --rsession-path "${RSESSION_WRAPPER_FILE}" --server-data-dir="${TMPDIR}/run" --secure-cookie-key-file "${TMPDIR}/rstudio-server/secure-cookie-key" --server-user=$(whoami) --database-config-file="$WORKING_DIR/database.conf"
 
 echo 'Singularity has exited...'
